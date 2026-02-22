@@ -5,36 +5,40 @@ import env from "./config/environment";
 
 const app = express();
 
-// CORS setup using env config
-const allowedOrigins = env.CORS_ORIGIN === "*"
-  ? ["*"]
-  : env.CORS_ORIGIN.split(",");
+const allowedOrigins =
+  env.CORS_ORIGIN === "*"
+    ? ["*"]
+    : env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
+      // Allow non-browser requests (like Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
   })
 );
+
+app.set("trust proxy", 1); // IMPORTANT for Render + cookies
 
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
-// routes
 app.get("/", (req, res) => {
-  const now = new Date(Date.now()); // or just new Date()
-const istTime = now.toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata'
-});
-  res.send("Server running. Date - "+istTime);
+  const now = new Date();
+  const istTime = now.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+  });
+  res.send("Server running. Date - " + istTime);
 });
 
 export default app;
