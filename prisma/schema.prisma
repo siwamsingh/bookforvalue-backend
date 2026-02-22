@@ -1,0 +1,326 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//////////////////////////////////////////////////////
+// ENUMS
+//////////////////////////////////////////////////////
+
+enum UserStatus {
+  active
+  inactive
+  blocked
+}
+
+enum UserRole {
+  customer
+  admin
+  super_admin
+  warehouse_manager
+  support_agent
+}
+
+enum OrderStatus {
+  placed
+  processing
+  shipping
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum PaymentType {
+  netbanking
+  upi
+  card
+  cod
+}
+
+enum ProductStatus {
+  active
+  inactive
+}
+
+enum DiscountStatus {
+  active
+  inactive
+}
+
+//////////////////////////////////////////////////////
+// USER
+//////////////////////////////////////////////////////
+
+model User {
+  id                  Int        @id @default(autoincrement())
+  username            String
+  phone_number        String     @unique
+  password            String
+  status              UserStatus @default(active)
+  role                UserRole   @default(customer)
+  refresh_token       String?
+  last_login_time     DateTime?
+  login_attempt       Int?       @default(0)
+  password_updated_at DateTime?
+  email_verified      Boolean    @default(false)
+  deleted_at          DateTime?
+
+  created_at          DateTime   @default(now())
+  updated_at          DateTime   @updatedAt
+
+  addresses           Address[]
+  cart                Cart[]
+  orders              Order[]
+
+  @@index([phone_number])
+}
+
+//////////////////////////////////////////////////////
+// ADDRESS
+//////////////////////////////////////////////////////
+
+model Address {
+  id                 Int      @id @default(autoincrement())
+  user_id            Int
+  specific_location  String
+  area               String
+  landmark           String?
+  pincode            String
+  town_or_city       String
+  state              String
+  country            String   @default("India")
+  deleted_at         DateTime?
+
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+//////////////////////////////////////////////////////
+// CATEGORY (with hierarchy)
+//////////////////////////////////////////////////////
+
+model Category {
+  id            Int       @id @default(autoincrement())
+  category_name String    @unique
+  parent_id     Int?
+
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  parent        Category? @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  children      Category[] @relation("CategoryHierarchy")
+
+  products      ProductCategory[]
+
+  @@index([parent_id])
+}
+
+//////////////////////////////////////////////////////
+// PRODUCT
+//////////////////////////////////////////////////////
+
+model Product {
+  id               Int           @id @default(autoincrement())
+  product_name     String
+  url_slug         String        @unique
+  description      String?
+  meta_title       String?
+  meta_description String?
+  price            Decimal       @db.Decimal(10,2)
+  stock_quantity   Int           @default(0)
+  status           ProductStatus @default(active)
+  deleted_at       DateTime?
+
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  images           ProductImage[]
+  categories       ProductCategory[]
+  cart             Cart[]
+  order_items      OrderItem[]
+  inventory_logs   InventoryLog[]
+
+  @@index([status])
+  @@index([price])
+}
+
+//////////////////////////////////////////////////////
+// PRODUCT IMAGES
+//////////////////////////////////////////////////////
+
+model ProductImage {
+  id         Int     @id @default(autoincrement())
+  product_id Int
+  image_url  String
+  is_default Boolean @default(false)
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@index([product_id])
+}
+
+//////////////////////////////////////////////////////
+// PRODUCT ↔ CATEGORY
+//////////////////////////////////////////////////////
+
+model ProductCategory {
+  id          Int @id @default(autoincrement())
+  product_id  Int
+  category_id Int
+
+  product  Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, category_id])
+}
+
+//////////////////////////////////////////////////////
+// CART
+//////////////////////////////////////////////////////
+
+model Cart {
+  id         Int @id @default(autoincrement())
+  user_id    Int
+  product_id Int
+  quantity   Int
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, product_id])
+  @@index([user_id])
+}
+
+//////////////////////////////////////////////////////
+// ORDER
+//////////////////////////////////////////////////////
+
+model Order {
+  id                     Int           @id @default(autoincrement())
+  order_number           String        @unique
+  user_id                Int
+  total_amount           Decimal       @db.Decimal(10,2)
+  discount_amount        Decimal       @db.Decimal(10,2) @default(0)
+  gross_amount           Decimal       @db.Decimal(10,2)
+  shipping_amount        Decimal       @db.Decimal(10,2) @default(0)
+  net_amount             Decimal       @db.Decimal(10,2)
+
+  status                 OrderStatus   @default(placed)
+
+  // Shipping snapshot (important for production)
+  shipping_name          String
+  shipping_phone         String
+  shipping_address_line  String
+  shipping_city          String
+  shipping_state         String
+  shipping_pincode       String
+  shipping_country       String
+
+  parcel_id              String?
+  deleted_at             DateTime?
+
+  created_at             DateTime      @default(now())
+  updated_at             DateTime      @updatedAt
+
+  user        User        @relation(fields: [user_id], references: [id])
+  order_items OrderItem[]
+  payments    Payment[]
+
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+}
+
+//////////////////////////////////////////////////////
+// ORDER ITEMS
+//////////////////////////////////////////////////////
+
+model OrderItem {
+  id           Int      @id @default(autoincrement())
+  order_id     Int
+  product_id   Int
+  quantity     Int
+  price        Decimal  @db.Decimal(10,2)
+  total_amount Decimal  @db.Decimal(10,2)
+
+  created_at   DateTime @default(now())
+
+  order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@index([order_id])
+  @@index([product_id])
+}
+
+//////////////////////////////////////////////////////
+// PAYMENT (separate model)
+//////////////////////////////////////////////////////
+
+model Payment {
+  id             Int           @id @default(autoincrement())
+  order_id       Int
+  amount         Decimal       @db.Decimal(10,2)
+  status         PaymentStatus @default(pending)
+  method         PaymentType
+  transaction_id String?
+  created_at     DateTime      @default(now())
+
+  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id])
+}
+
+//////////////////////////////////////////////////////
+// INVENTORY LOG
+//////////////////////////////////////////////////////
+
+model InventoryLog {
+  id         Int      @id @default(autoincrement())
+  product_id Int
+  change     Int
+  reason     String
+  created_at DateTime @default(now())
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@index([product_id])
+}
+
+//////////////////////////////////////////////////////
+// DISCOUNT
+//////////////////////////////////////////////////////
+
+model Discount {
+  id               Int            @id @default(autoincrement())
+  coupon_code      String         @unique
+  discount_value   Decimal        @db.Decimal(10,2)
+  min_order_value  Decimal?       @db.Decimal(10,2)
+  max_discount     Decimal?       @db.Decimal(10,2)
+  usage_limit      Int?
+  used_count       Int            @default(0)
+  per_user_limit   Int?
+  start_date       DateTime
+  end_date         DateTime
+  description      String?
+  status           DiscountStatus @default(active)
+
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
+}
