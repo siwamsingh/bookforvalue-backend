@@ -8,7 +8,9 @@ export default {
   PORT: Number(process.env.PORT) || 8000,
   TEST: process.env.TEST || "",
 
-  JWT_SECRET: process.env.JWT_SECRET as string,
+  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET as string,
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET as string,
+
   ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || "1d",
   REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || "3d",
 

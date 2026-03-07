@@ -65,6 +65,7 @@ enum DiscountStatus {
 model User {
   id                  Int        @id @default(autoincrement())
   username            String
+  email               String     @unique
   phone_number        String     @unique
   password            String
   status              UserStatus @default(active)
@@ -141,6 +142,7 @@ model Product {
   description      String?
   meta_title       String?
   meta_description String?
+  mrp              Decimal       @db.Decimal(10,2)
   price            Decimal       @db.Decimal(10,2)
   stock_quantity   Int           @default(0)
   status           ProductStatus @default(active)

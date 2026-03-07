@@ -3,6 +3,10 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import env from "./config/environment";
 
+import productRoutes from "./routes/product.routes";
+import authRoutes from "./routes/auth.routes"
+import categoryRoutes from "./routes/category.routes"
+
 const app = express();
 
 const allowedOrigins =
@@ -28,8 +32,8 @@ app.use(
 
 app.set("trust proxy", 1); // IMPORTANT for Render + cookies
 
-app.use(express.json({ limit: "16kb" }));
-app.use(express.urlencoded({ extended: true, limit: "16kb" }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
@@ -40,5 +44,15 @@ app.get("/", (req, res) => {
   });
   res.send("Server running. Date - " + istTime);
 });
+
+
+// PRODUCT ROUTES
+app.use("/api/products", productRoutes);
+
+// AUTH ROUTES
+app.use("/api/auth", authRoutes);  
+
+// CATEGORY ROUTES
+app.use("/api/categories", categoryRoutes);
 
 export default app;
