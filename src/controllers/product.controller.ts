@@ -82,6 +82,115 @@ export const addProduct = async (req: Request, res: Response) => {
 };
 
 /**
+ * 📦 BULK ADD PRODUCTS
+ */
+export const bulkAddProducts = async (req: Request, res: Response) => {
+  try {
+    const products = req.body;
+
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        message: "Request body must be an array of products",
+      });
+    }
+
+    const createdProducts: any[] = [];
+    const errors: any[] = [];
+
+    for (const item of products) {
+      try {
+        const {
+          title,
+          slug,
+          mrp,
+          price,
+          stock,
+          listing,
+          images = [],
+        } = item;
+
+        // Validation
+        if (!title || !slug || mrp === undefined) {
+          errors.push({
+            product: title || slug,
+            message: "Required fields missing",
+          });
+          continue;
+        }
+
+        // Check if slug already exists
+        const existing = await prisma.product.findUnique({
+          where: { url_slug: slug },
+        });
+
+        if (existing) {
+          errors.push({
+            product: title,
+            message: `Slug already exists: ${slug}`,
+          });
+          continue;
+        }
+
+        // ensure single default image
+        const defaultImages = images.filter((img: any) => img.is_default);
+        if (defaultImages.length > 1) {
+          errors.push({
+            product: title,
+            message: "Only one default image allowed",
+          });
+          continue;
+        }
+
+        const createdProduct = await prisma.product.create({
+          data: {
+            product_name: title,
+            url_slug: slug,
+            description: title || "",
+            mrp: Number(mrp),
+            price: Number(price || 0),
+            stock_quantity: Number(stock || 0),
+            status:
+              listing && listing.toString().trim().toLowerCase() === "active"
+                ? "active"
+                : "inactive",
+          },
+        });
+
+        // Save images
+        if (images.length > 0) {
+          await prisma.productImage.createMany({
+            data: images.map((img: any) => ({
+              product_id: createdProduct.id,
+              image_url: img.image_url,
+              is_default: img.is_default || false,
+            })),
+          });
+        }
+
+        createdProducts.push(createdProduct);
+      } catch (error: any) {
+        errors.push({
+          product: item.title || "Unknown",
+          message: error.message,
+        });
+      }
+    }
+
+    return res.status(201).json({
+      message: "Bulk upload completed",
+      inserted: createdProducts.length,
+      failed: errors.length,
+      errors,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Bulk upload failed",
+    });
+  }
+};
+
+/**
  * ✏️ UPDATE PRODUCT
  */
 export const updateProduct = async (req: Request, res: Response) => {

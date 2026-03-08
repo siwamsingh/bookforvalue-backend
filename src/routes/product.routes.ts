@@ -5,6 +5,7 @@ import {
   getProducts,
   getProductById,
   getProductBySlug,
+  bulkAddProducts,
 } from "../controllers/product.controller";
 import { verifyAuth } from "../middleware/auth.middleware";
 import { allowRoles } from "../middleware/role.middleware";
@@ -19,6 +20,9 @@ router.get("/slug/:slug", getProductBySlug);
 
 // ADMIN + SUPER ADMIN
 router.post("/", verifyAuth, allowRoles("admin", "super_admin"), addProduct);
+
+// BULK UPLOAD
+router.post("/bulk-upload", bulkAddProducts);
 
 // ADMIN + SUPER ADMIN get product by id
 router.get(
